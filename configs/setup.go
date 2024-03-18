@@ -16,8 +16,8 @@ type PostgresInstance struct {
 var PsClient PostgresInstance
 
 func ConnectToDb() {
-	psqlInfo := fmt.Sprintf("host=%s port=%s user=%s "+
-		"password=%s dbname=%s sslmode=disable", EnvHost(), EnvPortDb(), EnvUserDB(), EnvPassword(), EnvDB())
+	psqlInfo := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		EnvHost(), EnvPortDb(), EnvUserDB(), EnvPassword(), EnvDB())
 
 	var err error
 	PsClient.DB, err = sqlx.Open("postgres", psqlInfo)
@@ -30,7 +30,7 @@ func ConnectToDb() {
 	defer cancel()
 	err = PsClient.DB.PingContext(ctx)
 	if err != nil {
-		logrus.Errorf("error occur on ping: %s", err)
+		logrus.Errorf("error occur on ping: %s", err.Error())
 		err := PsClient.DB.Close()
 		if err != nil {
 			logrus.Fatal(err)
