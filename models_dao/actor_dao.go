@@ -3,8 +3,8 @@ package models_dao
 import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
-	"github.com/jorgini/filmoteka/app"
-	"github.com/jorgini/filmoteka/app/configs"
+	"github.com/jorgini/filmoteka"
+	"github.com/jorgini/filmoteka/configs"
 	"strings"
 )
 
@@ -29,7 +29,7 @@ func getSearchCondition(name, surname *string) string {
 	return strings.Join(condition, " AND ")
 }
 
-func (a *ActorDao) CreateActor(tx *sqlx.Tx, actor app.Actor) (int, error) {
+func (a *ActorDao) CreateActor(tx *sqlx.Tx, actor filmoteka.Actor) (int, error) {
 	query := fmt.Sprintf("INSERT INTO %s (name, surname, sex, birthday) values ($1, $2, $3, TO_DATE($4,'DD-MM-YYYY')) RETURNING id",
 		configs.EnvActorTable())
 
@@ -41,7 +41,7 @@ func (a *ActorDao) CreateActor(tx *sqlx.Tx, actor app.Actor) (int, error) {
 	return id, nil
 }
 
-func (a *ActorDao) UpdateActor(tx *sqlx.Tx, actor app.UpdateActorInput) error {
+func (a *ActorDao) UpdateActor(tx *sqlx.Tx, actor filmoteka.UpdateActorInput) error {
 	query := fmt.Sprintf("UPDATE %s SET %s WHERE id=%d", configs.EnvActorTable(), actor.GetValuesUpdate(), *actor.Id)
 
 	if _, err := tx.Query(query, actor.GetArgsUpdate()...); err != nil {
@@ -61,21 +61,21 @@ func (a *ActorDao) GetActorId(name, surname string) (int, error) {
 	return id, nil
 }
 
-func (a *ActorDao) GetActorById(id int) (app.Actor, error) {
+func (a *ActorDao) GetActorById(id int) (filmoteka.Actor, error) {
 	query := fmt.Sprintf("SELECT * FROM %s WHERE id=$1", configs.EnvActorTable())
 
-	var actor app.Actor
+	var actor filmoteka.Actor
 	err := a.db.Get(&actor, query, id)
 	if err != nil {
-		return app.Actor{}, err
+		return filmoteka.Actor{}, err
 	}
 	return actor, nil
 }
 
-func (a *ActorDao) GetActorsList(page, limit int) ([]app.Actor, error) {
+func (a *ActorDao) GetActorsList(page, limit int) ([]filmoteka.Actor, error) {
 	query := fmt.Sprintf("SELECT * FROM %s LIMIT $1 OFFSET $2", configs.EnvActorTable())
 
-	var actors []app.Actor
+	var actors []filmoteka.Actor
 	if err := a.db.Select(&actors, query, limit, (page-1)*limit); err != nil {
 		return nil, err
 	}
@@ -83,22 +83,22 @@ func (a *ActorDao) GetActorsList(page, limit int) ([]app.Actor, error) {
 	return actors, nil
 }
 
-func (a *ActorDao) SearchActor(page, limit int, name, surname *string) ([]app.Actor, error) {
+func (a *ActorDao) SearchActor(page, limit int, name, surname *string) ([]filmoteka.Actor, error) {
 	query := fmt.Sprintf("SELECT * FROM %s WHERE %s LIMIT %d OFFSET %d",
 		configs.EnvActorTable(), getSearchCondition(name, surname), limit, limit*(page-1))
 
-	var actors []app.Actor
+	var actors []filmoteka.Actor
 	if err := a.db.Select(&actors, query); err != nil {
 		return nil, err
 	}
 	return actors, nil
 }
 
-func (a *ActorDao) GetFilmsWithCurActor(actorId int) ([]app.Film, error) {
-	query := fmt.Sprintf("SELECT f.* FROM %s f, %s s WHERE s.film_id=f.id AND s.actor_id=$1",
+func (a *ActorDao) GetFilmsWithCurActor(actorId int) ([]filmoteka.Film, error) {
+	query := fmt.Sprintf("SELECT f.* FROM %s f INNER JOIN %s s ON s.film_id=f.id WHERE s.actor_id=$1",
 		configs.EnvFilmTable(), configs.EnvStarredTable())
 
-	var films []app.Film
+	var films []filmoteka.Film
 	if err := a.db.Select(&films, query, actorId); err != nil {
 		return nil, err
 	}

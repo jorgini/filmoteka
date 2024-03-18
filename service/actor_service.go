@@ -1,8 +1,8 @@
 package service
 
 import (
-	"github.com/jorgini/filmoteka/app"
-	"github.com/jorgini/filmoteka/app/models_dao"
+	"github.com/jorgini/filmoteka"
+	"github.com/jorgini/filmoteka/models_dao"
 )
 
 type ActorService struct {
@@ -17,7 +17,7 @@ func NewActorService(dao models_dao.Actor, tx models_dao.Transaction) *ActorServ
 	}
 }
 
-func (a *ActorService) CreateActor(actor app.Actor) (int, error) {
+func (a *ActorService) CreateActor(actor filmoteka.Actor) (int, error) {
 	transaction, err := a.tx.StartTransaction()
 	if err != nil {
 		return 0, err
@@ -31,7 +31,7 @@ func (a *ActorService) CreateActor(actor app.Actor) (int, error) {
 	return id, a.tx.Commit(transaction)
 }
 
-func (a *ActorService) UpdateActor(actor app.UpdateActorInput) error {
+func (a *ActorService) UpdateActor(actor filmoteka.UpdateActorInput) error {
 	transaction, err := a.tx.StartTransaction()
 	if err != nil {
 		return err
@@ -48,13 +48,13 @@ func (a *ActorService) GetActorId(name, surname string) (int, error) {
 	return a.dao.GetActorId(name, surname)
 }
 
-func (a *ActorService) GetActorsList(page, limit int) ([]app.ActorListItem, error) {
+func (a *ActorService) GetActorsList(page, limit int) ([]filmoteka.ActorListItem, error) {
 	actors, err := a.dao.GetActorsList(page, limit)
 	if err != nil {
 		return nil, err
 	}
 
-	list := make([]app.ActorListItem, len(actors))
+	list := make([]filmoteka.ActorListItem, len(actors))
 	for i := range actors {
 		list[i].Actor = actors[i]
 		list[i].Films, err = a.dao.GetFilmsWithCurActor(actors[i].Id)
@@ -65,26 +65,26 @@ func (a *ActorService) GetActorsList(page, limit int) ([]app.ActorListItem, erro
 	return list, nil
 }
 
-func (a *ActorService) GetActorById(id int) (app.ActorListItem, error) {
+func (a *ActorService) GetActorById(id int) (filmoteka.ActorListItem, error) {
 	actor, err := a.dao.GetActorById(id)
 	if err != nil {
-		return app.ActorListItem{}, err
+		return filmoteka.ActorListItem{}, err
 	}
 
 	films, err := a.dao.GetFilmsWithCurActor(actor.Id)
 	if err != nil {
-		return app.ActorListItem{}, err
+		return filmoteka.ActorListItem{}, err
 	}
-	return app.ActorListItem{Actor: actor, Films: films}, nil
+	return filmoteka.ActorListItem{Actor: actor, Films: films}, nil
 }
 
-func (a *ActorService) SearchActor(page, limit int, fragment app.ActorSearchFragment) ([]app.ActorListItem, error) {
+func (a *ActorService) SearchActor(page, limit int, fragment filmoteka.ActorSearchFragment) ([]filmoteka.ActorListItem, error) {
 	actors, err := a.dao.SearchActor(page, limit, fragment.Name, fragment.Surname)
 	if err != nil {
 		return nil, err
 	}
 
-	list := make([]app.ActorListItem, len(actors))
+	list := make([]filmoteka.ActorListItem, len(actors))
 	for i := range actors {
 		list[i].Actor = actors[i]
 		list[i].Films, err = a.dao.GetFilmsWithCurActor(actors[i].Id)

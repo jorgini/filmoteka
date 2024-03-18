@@ -3,8 +3,8 @@ package models_dao
 import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
-	"github.com/jorgini/filmoteka/app"
-	"github.com/jorgini/filmoteka/app/configs"
+	"github.com/jorgini/filmoteka"
+	"github.com/jorgini/filmoteka/configs"
 )
 
 type UserDao struct {
@@ -17,7 +17,7 @@ func NewUserDao(db *sqlx.DB) *UserDao {
 	}
 }
 
-func (u *UserDao) CreateUser(tx *sqlx.Tx, user app.User) (int, error) {
+func (u *UserDao) CreateUser(tx *sqlx.Tx, user filmoteka.User) (int, error) {
 	var id int
 	query := fmt.Sprintf("INSERT INTO %s (login, password, user_role) values ($1, $2, $3) RETURNING id",
 		configs.EnvUserTable())
@@ -29,12 +29,12 @@ func (u *UserDao) CreateUser(tx *sqlx.Tx, user app.User) (int, error) {
 	return id, nil
 }
 
-func (u *UserDao) GetUser(login, password string) (app.User, error) {
+func (u *UserDao) GetUser(login, password string) (filmoteka.User, error) {
 	query := fmt.Sprintf("SELECT * FROM %s WHERE login=$1 AND password=$2", configs.EnvUserTable())
 
-	var user app.User
+	var user filmoteka.User
 	if err := u.db.Get(&user, query, login, password); err != nil {
-		return app.User{}, err
+		return filmoteka.User{}, err
 	}
 	return user, nil
 }

@@ -1,7 +1,8 @@
 package handlers
 
 import (
-	"github.com/jorgini/filmoteka/app"
+	"fmt"
+	"github.com/jorgini/filmoteka"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"strconv"
@@ -11,13 +12,14 @@ var (
 	sortingOption = map[string]struct{}{"title": {}, "rating": {}, "issue_date": {}}
 )
 
-func (r *Router) createNewFilm(writer http.ResponseWriter, request *http.Request) {
-	ok, id := r.validateUser(writer, request)
-	if !ok {
+func createNewFilm(r *Router, writer http.ResponseWriter, request *http.Request) {
+	id, err := getUserId(request)
+	if err != nil {
+		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	var film app.InputFilm
+	var film filmoteka.InputFilm
 	if err := parseBody(request.Body, &film); err != nil {
 		r.sendErrorResponse(writer, http.StatusBadRequest, err.Error())
 		return
@@ -29,53 +31,71 @@ func (r *Router) createNewFilm(writer http.ResponseWriter, request *http.Request
 		return
 	}
 
+	if err = writeBody(writer, fmt.Sprintf("successfully create film with id %d", filmId)); err != nil {
+		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
+	}
+
 	logrus.Infof("new film with id %d was created by user with id %d", filmId, id)
 }
 
-func (r *Router) updateFilm(writer http.ResponseWriter, request *http.Request) {
-	ok, id := r.validateUser(writer, request)
-	if !ok {
-		r.sendErrorResponse(writer, http.StatusLocked, "this function locked for current user")
+func updateFilm(r *Router, writer http.ResponseWriter, request *http.Request) {
+	id, err := getUserId(request)
+	if err != nil {
+		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	filmId, err := strconv.Atoi(request.URL.Query().Get("id"))
 	if err != nil {
-		r.sendErrorResponse(writer, http.StatusBadRequest, "no specified id for update film")
+		r.sendErrorResponse(writer, http.StatusBadRequest, "no id specified to update film")
 		return
 	}
 
-	var update app.UpdateFilmInput
-	if err := parseBody(request.Body, &update); err != nil {
+	var update filmoteka.UpdateFilmInput
+	if err = parseBody(request.Body, &update); err != nil {
 		r.sendErrorResponse(writer, http.StatusBadRequest, err.Error())
 		return
 	}
 	update.Id = &filmId
 
-	if err := r.service.Film.UpdateFilm(update); err != nil {
+	if err = r.service.Film.UpdateFilm(update); err != nil {
 		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	if err = writeBody(writer, "successfully update"); err != nil {
+		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 	}
 
 	logrus.Infof("film with id %d was updated by user with id %d", filmId, id)
 }
 
-func (r *Router) getSortedFilmList(writer http.ResponseWriter, request *http.Request) {
+func getSortedFilmList(r *Router, writer http.ResponseWriter, request *http.Request) {
 	sort := request.URL.Query().Get("sort_by")
 	if sort == "" {
 		sort = "rating"
 	} else if _, ok := sortingOption[sort]; !ok {
-		r.sendErrorResponse(writer, http.StatusBadRequest, "invalid parameter for sort films list")
+		r.sendErrorResponse(writer, http.StatusBadRequest, "invalid parameter to sort films list")
+		return
 	}
 
 	page, err := strconv.Atoi(request.URL.Query().Get("page"))
 	if err != nil {
 		r.sendErrorResponse(writer, http.StatusBadRequest, "no page specified for sorted list")
+		return
+	}
+	if page < 0 {
+		r.sendErrorResponse(writer, http.StatusBadRequest, "page out of bounds")
+		return
 	}
 
 	films, err := r.service.Film.GetSortedFilmList(sort, page, limitOnPage)
 	if err != nil {
 		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if len(films) == 0 {
+		r.sendErrorResponse(writer, http.StatusBadRequest, "page out of bounds")
 		return
 	}
 
@@ -86,10 +106,14 @@ func (r *Router) getSortedFilmList(writer http.ResponseWriter, request *http.Req
 	logrus.Infof("sorted by %s list of films was sent to user", sort)
 }
 
-func (r *Router) getCurrentFilm(writer http.ResponseWriter, request *http.Request) {
+func getCurrentFilm(r *Router, writer http.ResponseWriter, request *http.Request) {
 	id, err := strconv.Atoi(request.URL.Query().Get("id"))
 	if err != nil {
 		r.sendErrorResponse(writer, http.StatusBadRequest, "id for get film not specified")
+		return
+	}
+	if id < 1 {
+		r.sendErrorResponse(writer, http.StatusBadRequest, "id out of bounds")
 		return
 	}
 
@@ -99,21 +123,21 @@ func (r *Router) getCurrentFilm(writer http.ResponseWriter, request *http.Reques
 		return
 	}
 
-	// Film here is transmitted by pointer for correct marshaling date
-	if err := writeBody(writer, &film); err != nil {
+	if err := writeBody(writer, film); err != nil {
 		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 		return
 	}
 	logrus.Infof("film with id %d was sent to user", id)
 }
 
-func (r *Router) getSearchFilmList(writer http.ResponseWriter, request *http.Request) {
+func getSearchFilmList(r *Router, writer http.ResponseWriter, request *http.Request) {
 	page, err := strconv.Atoi(request.URL.Query().Get("page"))
 	if err != nil {
 		r.sendErrorResponse(writer, http.StatusBadRequest, "no page specified for search list")
+		return
 	}
 
-	var input app.FilmSearchFragment
+	var input filmoteka.FilmSearchFragment
 	if err := parseBody(request.Body, &input); err != nil {
 		r.sendErrorResponse(writer, http.StatusBadRequest, err.Error())
 		return
@@ -124,6 +148,10 @@ func (r *Router) getSearchFilmList(writer http.ResponseWriter, request *http.Req
 		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if len(films) == 0 {
+		r.sendErrorResponse(writer, http.StatusBadRequest, "nothing find")
+		return
+	}
 
 	if err := writeBody(writer, films); err != nil {
 		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
@@ -132,21 +160,26 @@ func (r *Router) getSearchFilmList(writer http.ResponseWriter, request *http.Req
 	logrus.Info("search list of films was sent to user")
 }
 
-func (r *Router) deleteFilm(writer http.ResponseWriter, request *http.Request) {
-	ok, id := r.validateUser(writer, request)
-	if !ok {
+func deleteFilm(r *Router, writer http.ResponseWriter, request *http.Request) {
+	id, err := getUserId(request)
+	if err != nil {
+		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	filmId, err := strconv.Atoi(request.URL.Query().Get("id"))
 	if err != nil {
-		r.sendErrorResponse(writer, http.StatusBadRequest, "no id specified for delete film")
+		r.sendErrorResponse(writer, http.StatusBadRequest, "id doesnt specified to delete film")
 		return
 	}
 
-	if err := r.service.Film.DeleteFilmById(filmId); err != nil {
+	if err = r.service.Film.DeleteFilmById(filmId); err != nil {
 		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	if err = writeBody(writer, "successfully delete"); err != nil {
+		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 	}
 
 	logrus.Infof("film with id %d was deleted by user with id %d", filmId, id)

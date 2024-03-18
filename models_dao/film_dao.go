@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jmoiron/sqlx"
-	"github.com/jorgini/filmoteka/app"
-	"github.com/jorgini/filmoteka/app/configs"
+	"github.com/jorgini/filmoteka"
+	"github.com/jorgini/filmoteka/configs"
 	"github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 	"strings"
@@ -33,7 +33,7 @@ const (
 		`
 )
 
-func getFilmSearchCondition(fragment app.FilmSearchFragment) string {
+func getFilmSearchCondition(fragment filmoteka.FilmSearchFragment) string {
 	condition := make([]string, 0, 3)
 	if fragment.Title != nil {
 		condition = append(condition, fmt.Sprintf("POSITION('%s' in f.title)>0", *fragment.Title))
@@ -47,7 +47,7 @@ func getFilmSearchCondition(fragment app.FilmSearchFragment) string {
 	return strings.Join(condition, " AND ")
 }
 
-func (f *FilmDao) CreateFilm(tx *sqlx.Tx, film app.Film) (int, error) {
+func (f *FilmDao) CreateFilm(tx *sqlx.Tx, film filmoteka.Film) (int, error) {
 	query := fmt.Sprintf("INSERT INTO %s (title,description,issue_date,rating) values ($1, $2, TO_DATE($3,'DD-MM-YYYY'), $4) RETURNING id",
 		configs.EnvFilmTable())
 
@@ -70,7 +70,7 @@ func (f *FilmDao) AddDependency(tx *sqlx.Tx, filmId, actorId int) error {
 	return nil
 }
 
-func (f *FilmDao) UpdateFilm(tx *sqlx.Tx, film app.UpdateFilmInput) error {
+func (f *FilmDao) UpdateFilm(tx *sqlx.Tx, film filmoteka.UpdateFilmInput) error {
 	query := fmt.Sprintf("UPDATE %s SET %s WHERE id=%d", configs.EnvFilmTable(), film.GetValuesUpdate(), *film.Id)
 
 	if _, err := tx.Exec(query, film.GetArgsUpdate()...); err != nil {
@@ -100,55 +100,55 @@ func (f *FilmDao) UpdateDependencies(tx *sqlx.Tx, filmId int, actorIds ...int) e
 	return nil
 }
 
-func (f *FilmDao) GetSortedFilmList(sortBy string, page, limit int) ([]app.Film, error) {
+func (f *FilmDao) GetSortedFilmList(sortBy string, page, limit int) ([]filmoteka.Film, error) {
 	query := fmt.Sprintf("SELECT * FROM %s ORDER BY %s DESC LIMIT $1 OFFSET $2", configs.EnvFilmTable(), sortBy)
 
-	var films []app.Film
+	var films []filmoteka.Film
 	if err := f.db.Select(&films, query, limit, limit*(page-1)); err != nil {
 		return nil, err
 	}
 	return films, nil
 }
 
-func (f *FilmDao) GetFilmListByTitle(page, limit int, title string) ([]app.Film, error) {
+func (f *FilmDao) GetFilmListByTitle(page, limit int, title string) ([]filmoteka.Film, error) {
 	query := fmt.Sprintf("SELECT * FROM %s WHERE POSITION('%s' in title) > 0 LIMIT $1 OFFSET $2",
 		configs.EnvFilmTable(), title)
 
-	var films []app.Film
+	var films []filmoteka.Film
 	if err := f.db.Select(&films, query, limit, limit*(page-1)); err != nil {
 		return nil, err
 	}
 	return films, nil
 }
 
-func (f *FilmDao) GetCurFilm(id int) (app.Film, error) {
+func (f *FilmDao) GetCurFilm(id int) (filmoteka.Film, error) {
 	query := fmt.Sprintf("SELECT * FROM %s WHERE id=$1", configs.EnvFilmTable())
 
-	var film []app.Film
+	var film []filmoteka.Film
 	if err := f.db.Select(&film, query, id); err != nil {
-		return app.Film{}, err
+		return filmoteka.Film{}, err
 	} else if len(film) == 0 {
-		return app.Film{}, errors.New("no film find")
+		return filmoteka.Film{}, errors.New("no film find")
 	}
 	return film[0], nil
 }
 
-func (f *FilmDao) GetActorsInCurFilm(filmId int) ([]app.InputActor, error) {
-	query := fmt.Sprintf("SELECT a.name, a.surname FROM %s a, %s s WHERE a.id = s.actor_id AND s.film_id=$1",
+func (f *FilmDao) GetActorsInCurFilm(filmId int) ([]filmoteka.InputActor, error) {
+	query := fmt.Sprintf("SELECT a.name, a.surname FROM %s a INNER JOIN %s s ON a.id = s.actor_id WHERE s.film_id=$1",
 		configs.EnvActorTable(), configs.EnvStarredTable())
 
-	var actors []app.InputActor
+	var actors []filmoteka.InputActor
 	if err := f.db.Select(&actors, query, filmId); err != nil {
 		return nil, err
 	}
 	return actors, nil
 }
 
-func (f *FilmDao) GetFilmListByActor(page, limit int, fragment app.FilmSearchFragment) ([]app.Film, error) {
+func (f *FilmDao) GetFilmListByActor(page, limit int, fragment filmoteka.FilmSearchFragment) ([]filmoteka.Film, error) {
 	query := fmt.Sprintf(searchQuery, configs.EnvStarredTable(), configs.EnvFilmTable(),
 		configs.EnvActorTable(), getFilmSearchCondition(fragment))
 
-	var films []app.Film
+	var films []filmoteka.Film
 	if err := f.db.Select(&films, query, limit, limit*(page-1)); err != nil {
 		return nil, err
 	}

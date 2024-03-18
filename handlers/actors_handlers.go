@@ -1,7 +1,8 @@
 package handlers
 
 import (
-	"github.com/jorgini/filmoteka/app"
+	"fmt"
+	"github.com/jorgini/filmoteka"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"strconv"
@@ -11,13 +12,14 @@ const (
 	limitOnPage = 10
 )
 
-func (r *Router) createNewActor(writer http.ResponseWriter, request *http.Request) {
-	ok, id := r.validateUser(writer, request)
-	if !ok {
+func createNewActor(r *Router, writer http.ResponseWriter, request *http.Request) {
+	id, err := getUserId(request)
+	if err != nil {
+		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	var actor app.Actor
+	var actor filmoteka.Actor
 	if err := parseBody(request.Body, &actor); err != nil {
 		r.sendErrorResponse(writer, http.StatusBadRequest, err.Error())
 		return
@@ -29,12 +31,17 @@ func (r *Router) createNewActor(writer http.ResponseWriter, request *http.Reques
 		return
 	}
 
+	if err = writeBody(writer, fmt.Sprintf("successfully create actor with id %d", actorId)); err != nil {
+		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
+	}
+
 	logrus.Infof("new actor with id %d was created by user with id %d", actorId, id)
 }
 
-func (r *Router) updateActor(writer http.ResponseWriter, request *http.Request) {
-	ok, id := r.validateUser(writer, request)
-	if !ok {
+func updateActor(r *Router, writer http.ResponseWriter, request *http.Request) {
+	id, err := getUserId(request)
+	if err != nil {
+		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -44,31 +51,43 @@ func (r *Router) updateActor(writer http.ResponseWriter, request *http.Request) 
 		return
 	}
 
-	var input app.UpdateActorInput
-	if err := parseBody(request.Body, &input); err != nil {
+	var input filmoteka.UpdateActorInput
+	if err = parseBody(request.Body, &input); err != nil {
 		r.sendErrorResponse(writer, http.StatusBadRequest, err.Error())
 		return
 	}
 	input.Id = &actorId
 
-	if err := r.service.Actor.UpdateActor(input); err != nil {
+	if err = r.service.Actor.UpdateActor(input); err != nil {
 		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	if err = writeBody(writer, "successfully update"); err != nil {
+		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 	}
 
 	logrus.Infof("actor with id %d has been updated by user with id %d", *input.Id, id)
 }
 
-func (r *Router) getActorsList(writer http.ResponseWriter, request *http.Request) {
+func getActorsList(r *Router, writer http.ResponseWriter, request *http.Request) {
 	page, err := strconv.Atoi(request.URL.Query().Get("page"))
 	if err != nil {
 		r.sendErrorResponse(writer, http.StatusBadRequest, "page not selected")
+		return
+	}
+	if page < 1 {
+		r.sendErrorResponse(writer, http.StatusBadRequest, "page out of bounds")
 		return
 	}
 
 	actors, err := r.service.Actor.GetActorsList(page, limitOnPage)
 	if err != nil {
 		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if len(actors) == 0 {
+		r.sendErrorResponse(writer, http.StatusBadRequest, "page out of bounds")
 		return
 	}
 
@@ -79,10 +98,14 @@ func (r *Router) getActorsList(writer http.ResponseWriter, request *http.Request
 	logrus.Infof("list of actors in page %d was sending to user", page)
 }
 
-func (r *Router) getActorById(writer http.ResponseWriter, request *http.Request) {
+func getActorById(r *Router, writer http.ResponseWriter, request *http.Request) {
 	actorId, err := strconv.Atoi(request.URL.Query().Get("id"))
 	if err != nil {
 		r.sendErrorResponse(writer, http.StatusBadRequest, "id not selected")
+		return
+	}
+	if actorId < 1 {
+		r.sendErrorResponse(writer, http.StatusBadRequest, "id out of bounds")
 		return
 	}
 
@@ -96,17 +119,17 @@ func (r *Router) getActorById(writer http.ResponseWriter, request *http.Request)
 		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 		return
 	}
-	logrus.Infof("actor %s was sent to user", actor)
+	logrus.Infof("actor %s was sent to user", actor.Actor.Surname)
 }
 
-func (r *Router) searchActor(writer http.ResponseWriter, request *http.Request) {
+func searchActor(r *Router, writer http.ResponseWriter, request *http.Request) {
 	page, err := strconv.Atoi(request.URL.Query().Get("page"))
 	if err != nil {
 		r.sendErrorResponse(writer, http.StatusBadRequest, "page not selected")
 		return
 	}
 
-	var fragment app.ActorSearchFragment
+	var fragment filmoteka.ActorSearchFragment
 	if err := parseBody(request.Body, &fragment); err != nil {
 		r.sendErrorResponse(writer, http.StatusBadRequest, err.Error())
 		return
@@ -117,6 +140,9 @@ func (r *Router) searchActor(writer http.ResponseWriter, request *http.Request) 
 		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if len(actors) == 0 {
+		r.sendErrorResponse(writer, http.StatusBadRequest, "nothing find")
+	}
 
 	if err := writeBody(writer, actors...); err != nil {
 		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
@@ -125,9 +151,10 @@ func (r *Router) searchActor(writer http.ResponseWriter, request *http.Request) 
 	logrus.Info("result of search actor with fragment name was sending to user")
 }
 
-func (r *Router) deleteActor(writer http.ResponseWriter, request *http.Request) {
-	ok, id := r.validateUser(writer, request)
-	if !ok {
+func deleteActor(r *Router, writer http.ResponseWriter, request *http.Request) {
+	id, err := getUserId(request)
+	if err != nil {
+		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -137,9 +164,13 @@ func (r *Router) deleteActor(writer http.ResponseWriter, request *http.Request) 
 		return
 	}
 
-	if err := r.service.Actor.DeleteActorById(inputId); err != nil {
+	if err = r.service.Actor.DeleteActorById(inputId); err != nil {
 		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if err = writeBody(writer, "successful delete"); err != nil {
+		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
+	}
+
 	logrus.Infof("actor with id %d has been deleted by user with id %d", inputId, id)
 }

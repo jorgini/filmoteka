@@ -1,4 +1,4 @@
-package app
+package filmoteka
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ type Film struct {
 	Id          int    `json:"id" db:"id"`
 	Title       string `json:"title" db:"title"`
 	Description string `json:"description" db:"description"`
-	IssueDate   Date   `json:"issue_date" db:"issue_date"`
+	IssueDate   *Date  `json:"issue_date" db:"issue_date"`
 	Rating      int    `json:"rating" db:"rating"`
 }
 
@@ -37,7 +37,7 @@ func (f *Film) UnmarshalJSON(data []byte) error {
 		if result.Description != nil {
 			f.Description = *result.Description
 		}
-		f.IssueDate = *result.IssueDate
+		f.IssueDate = result.IssueDate
 		f.Rating = *result.Rating
 	}
 	return nil

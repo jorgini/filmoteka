@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/jorgini/filmoteka/app"
-	"github.com/jorgini/filmoteka/app/models_dao"
+	"github.com/jorgini/filmoteka"
+	"github.com/jorgini/filmoteka/models_dao"
 	"time"
 )
 
@@ -33,7 +33,7 @@ func NewUserService(dao models_dao.User, tx models_dao.Transaction) *UserService
 	}
 }
 
-func (u *UserService) CreateUser(user app.User) (int, error) {
+func (u *UserService) CreateUser(user filmoteka.User) (int, error) {
 	user.Password = generateHashPassword(user.Password)
 
 	transaction, err := u.tx.StartTransaction()

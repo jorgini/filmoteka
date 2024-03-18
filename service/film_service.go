@@ -1,8 +1,8 @@
 package service
 
 import (
-	"github.com/jorgini/filmoteka/app"
-	"github.com/jorgini/filmoteka/app/models_dao"
+	"github.com/jorgini/filmoteka"
+	"github.com/jorgini/filmoteka/models_dao"
 	"github.com/sirupsen/logrus"
 )
 
@@ -20,7 +20,7 @@ func NewFilmService(filmDao models_dao.Film, actorDao models_dao.Actor, tx model
 	}
 }
 
-func (f *FilmService) CreateFilm(film app.InputFilm) (int, error) {
+func (f *FilmService) CreateFilm(film filmoteka.InputFilm) (int, error) {
 	transaction, err := f.tx.StartTransaction()
 	if err != nil {
 		return 0, err
@@ -46,7 +46,7 @@ func (f *FilmService) CreateFilm(film app.InputFilm) (int, error) {
 	return filmId, f.tx.Commit(transaction)
 }
 
-func (f *FilmService) UpdateFilm(film app.UpdateFilmInput) error {
+func (f *FilmService) UpdateFilm(film filmoteka.UpdateFilmInput) error {
 	transaction, err := f.tx.StartTransaction()
 	if err != nil {
 		return err
@@ -74,13 +74,13 @@ func (f *FilmService) UpdateFilm(film app.UpdateFilmInput) error {
 	return f.tx.Commit(transaction)
 }
 
-func (f *FilmService) GetSortedFilmList(sortBy string, page, limit int) ([]app.InputFilm, error) {
+func (f *FilmService) GetSortedFilmList(sortBy string, page, limit int) ([]filmoteka.InputFilm, error) {
 	films, err := f.film.GetSortedFilmList(sortBy, page, limit)
 	if err != nil {
 		return nil, err
 	}
 
-	output := make([]app.InputFilm, len(films))
+	output := make([]filmoteka.InputFilm, len(films))
 	for i := range output {
 		output[i].Film = films[i]
 		output[i].Cast, err = f.film.GetActorsInCurFilm(films[i].Id)
@@ -91,30 +91,30 @@ func (f *FilmService) GetSortedFilmList(sortBy string, page, limit int) ([]app.I
 	return output, nil
 }
 
-func (f *FilmService) GetCurFilm(id int) (app.InputFilm, error) {
-	var film app.InputFilm
+func (f *FilmService) GetCurFilm(id int) (filmoteka.InputFilm, error) {
+	var film filmoteka.InputFilm
 	var err error
 	film.Film, err = f.film.GetCurFilm(id)
 	if err != nil {
-		return app.InputFilm{}, err
+		return filmoteka.InputFilm{}, err
 	}
 
 	film.Cast, err = f.film.GetActorsInCurFilm(id)
 	if err != nil {
-		return app.InputFilm{}, err
+		return filmoteka.InputFilm{}, err
 	}
 
 	return film, nil
 }
 
-func (f *FilmService) GetSearchFilmList(page, limit int, fragment app.FilmSearchFragment) ([]app.InputFilm, error) {
+func (f *FilmService) GetSearchFilmList(page, limit int, fragment filmoteka.FilmSearchFragment) ([]filmoteka.InputFilm, error) {
 	if fragment.Name == nil && fragment.Surname == nil {
 		films, err := f.film.GetFilmListByTitle(page, limit, *fragment.Title)
 		if err != nil {
 			return nil, err
 		}
 
-		output := make([]app.InputFilm, len(films))
+		output := make([]filmoteka.InputFilm, len(films))
 		for i := range films {
 			output[i].Film = films[i]
 			output[i].Cast, err = f.film.GetActorsInCurFilm(films[i].Id)
@@ -129,7 +129,7 @@ func (f *FilmService) GetSearchFilmList(page, limit int, fragment app.FilmSearch
 			return nil, err
 		}
 
-		output := make([]app.InputFilm, len(films))
+		output := make([]filmoteka.InputFilm, len(films))
 		for i := range films {
 			output[i].Film = films[i]
 			output[i].Cast, err = f.film.GetActorsInCurFilm(films[i].Id)

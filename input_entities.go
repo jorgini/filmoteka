@@ -1,4 +1,4 @@
-package app
+package filmoteka
 
 import (
 	"encoding/json"
@@ -44,11 +44,10 @@ func (c *Cast) UnmarshalJSON(data []byte) error {
 		if err != nil {
 			return err
 		}
-		if err = json.Unmarshal(data, &a); err != nil {
+		if err = a.UnmarshalJSON(data); err != nil {
 			return err
 		}
-		//a.Name = o.(map[string]interface{})["name"].(string)
-		//a.Surname = o.(map[string]interface{})["surname"].(string)
+
 		*c = append(*c, a)
 	}
 	return nil
@@ -57,6 +56,22 @@ func (c *Cast) UnmarshalJSON(data []byte) error {
 type InputFilm struct {
 	Film
 	Cast
+}
+
+func (i *InputFilm) UnmarshalJSON(data []byte) error {
+	var f Film
+	actors := struct {
+		Cast Cast `json:"Cast"`
+	}{}
+	if err := f.UnmarshalJSON(data); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, &actors); err != nil {
+		return err
+	}
+	i.Film = f
+	i.Cast = actors.Cast
+	return nil
 }
 
 type ActorListItem struct {

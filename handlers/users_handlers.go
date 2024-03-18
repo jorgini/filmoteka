@@ -3,13 +3,13 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"github.com/jorgini/filmoteka/app"
+	"github.com/jorgini/filmoteka"
 	"github.com/sirupsen/logrus"
 	"net/http"
 )
 
-func (r *Router) createNewUser(writer http.ResponseWriter, request *http.Request) {
-	var user app.User
+func createNewUser(r *Router, writer http.ResponseWriter, request *http.Request) {
+	var user filmoteka.User
 	if err := parseBody(request.Body, &user); err != nil {
 		r.sendErrorResponse(writer, http.StatusBadRequest, err.Error())
 		return
@@ -20,6 +20,11 @@ func (r *Router) createNewUser(writer http.ResponseWriter, request *http.Request
 		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 		return
 	}
+
+	if err = writeBody(writer, "successful"); err != nil {
+		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
+	}
+
 	logrus.Infof("a new user with an id %d has been registered", id)
 }
 
@@ -46,7 +51,7 @@ func (s *signInput) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (r *Router) authUser(writer http.ResponseWriter, request *http.Request) {
+func authUser(r *Router, writer http.ResponseWriter, request *http.Request) {
 	var input signInput
 	if err := parseBody(request.Body, &input); err != nil {
 		r.sendErrorResponse(writer, http.StatusBadRequest, err.Error())
@@ -90,10 +95,10 @@ func (u *updateInput) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (r *Router) updateUser(writer http.ResponseWriter, request *http.Request) {
-	ok, id := r.validateUser(writer, request)
-
-	if !ok {
+func updateUser(r *Router, writer http.ResponseWriter, request *http.Request) {
+	id, err := getUserId(request)
+	if err != nil {
+		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -103,16 +108,21 @@ func (r *Router) updateUser(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	err := r.service.User.UpdateUser(update.Login, update.UserRole)
+	err = r.service.User.UpdateUser(update.Login, update.UserRole)
 	if err != nil {
 		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 		return
 	}
+
+	if err = writeBody(writer, "successfully update user role"); err != nil {
+		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
+	}
+
 	logrus.Infof("the role of the %s user has been changed to %s by a user with an id %d",
 		update.Login, update.UserRole, id)
 }
 
-func (r *Router) deleteUser(writer http.ResponseWriter, request *http.Request) {
+func deleteUser(r *Router, writer http.ResponseWriter, request *http.Request) {
 	id, err := getUserId(request)
 	if err != nil {
 		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
@@ -122,5 +132,10 @@ func (r *Router) deleteUser(writer http.ResponseWriter, request *http.Request) {
 		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
 		return
 	}
+
+	if err = writeBody(writer, "user successfully deleted"); err != nil {
+		r.sendErrorResponse(writer, http.StatusInternalServerError, err.Error())
+	}
+
 	logrus.Infof("user with id %d has been deleted", id)
 }

@@ -1,8 +1,8 @@
-package app
+package filmoteka
 
 import (
 	"context"
-	"github.com/jorgini/filmoteka/app/configs"
+	"github.com/jorgini/filmoteka/configs"
 	"net/http"
 	"time"
 )
